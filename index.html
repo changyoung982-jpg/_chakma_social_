@@ -76,14 +76,14 @@
         // ==========================================
         // PASTE YOUR SUPABASE KEYS BELOW
         // ==========================================
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
+        const SUPABASE_URL = 'https://fxkqrrfbmefnglmslwzz.supabase.com';
+        const SUPABASE_ANON_KEY = 'sb_publishable_XOOIjkjmdBV7-nySiDR6KQ_TTkT7Ujr';
 
         let supabaseClient = null;
         let allWords = [];
 
         // Initialize Supabase
-        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') {
+        if (SUPABASE_URL !== 'https://fxkqrrfbmefnglmslwzz.supabase.com') {
             supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             document.getElementById('status-badge').innerText = 'Connected';
             document.getElementById('status-badge').className = 'text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold';
