@@ -1,10 +1,181 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chakma Social</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body>
-    <h1>Welcome to Chakma Social!</h1>
-    <p>App is live and connected.</p>
+<body class="bg-slate-100 text-slate-800 font-sans pb-20">
+
+    <!-- Top Header -->
+    <header class="bg-indigo-700 text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-bold tracking-wide">Chakma Social</h1>
+            <p class="text-xs text-indigo-200">Language, Culture & Community</p>
+        </div>
+        <span id="status-badge" class="text-xs bg-amber-500 text-white px-2 py-1 rounded-full font-semibold">Connecting...</span>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-md mx-auto p-4 space-y-6">
+
+        <!-- Search & Dictionary Section -->
+        <section id="tab-dictionary" class="space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm">
+                <h2 class="font-bold text-lg mb-2 text-indigo-900">Chakma Dictionary</h2>
+                <input type="text" id="search-input" onkeyup="filterWords()" placeholder="Search Chakma or English word..." 
+                    class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <!-- Add New Word Box -->
+            <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
+                <h3 class="font-semibold text-sm text-slate-600">Contribute a Word</h3>
+                <input type="text" id="chakma-word" placeholder="Chakma Word (or Script)" class="w-full p-2.5 border rounded-lg text-sm">
+                <input type="text" id="english-meaning" placeholder="English Meaning" class="w-full p-2.5 border rounded-lg text-sm">
+                <button onclick="addWord()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition">
+                    + Add to Dictionary
+                </button>
+            </div>
+
+            <!-- Word List -->
+            <div id="word-list" class="space-y-2">
+                <p class="text-center text-sm text-slate-400 py-4">Loading words...</p>
+            </div>
+        </section>
+
+        <!-- Community Feed Section (Hidden by default) -->
+        <section id="tab-feed" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
+                <h2 class="font-bold text-lg text-indigo-900">Community Wall</h2>
+                <textarea id="post-content" rows="2" placeholder="Share something with the Chakma community..." class="w-full p-2.5 border rounded-lg text-sm"></textarea>
+                <button onclick="addPost()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition">
+                    Post Update
+                </button>
+            </div>
+            <div id="feed-list" class="space-y-3">
+                <p class="text-center text-sm text-slate-400 py-4">Loading community posts...</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Mobile Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-3 shadow-lg">
+        <button onclick="switchTab('dictionary')" id="nav-dict" class="text-indigo-600 font-bold text-sm flex flex-col items-center">
+            <span>📖 Dictionary</span>
+        </button>
+        <button onclick="switchTab('feed')" id="nav-feed" class="text-slate-500 font-semibold text-sm flex flex-col items-center">
+            <span>💬 Community</span>
+        </button>
+    </nav>
+
+    <script>
+        // ==========================================
+        // PASTE YOUR SUPABASE KEYS BELOW
+        // ==========================================
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
+
+        let supabaseClient = null;
+        let allWords = [];
+
+        // Initialize Supabase
+        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            document.getElementById('status-badge').innerText = 'Connected';
+            document.getElementById('status-badge').className = 'text-xs bg-emerald-500 text-white px-2 py-1 rounded-full font-semibold';
+            loadWords();
+        } else {
+            document.getElementById('status-badge').innerText = 'Keys Needed';
+            document.getElementById('word-list').innerHTML = `
+                <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
+                    <strong>Almost ready!</strong> Edit <code>index.html</code> and paste your Supabase URL and Anon Key to load your live database.
+                </div>`;
+        }
+
+        // Switch Tabs
+        function switchTab(tab) {
+            document.getElementById('tab-dictionary').classList.toggle('hidden', tab !== 'dictionary');
+            document.getElementById('tab-feed').classList.toggle('hidden', tab !== 'feed');
+            document.getElementById('nav-dict').className = tab === 'dictionary' ? 'text-indigo-600 font-bold text-sm' : 'text-slate-500 font-semibold text-sm';
+            document.getElementById('nav-feed').className = tab === 'feed' ? 'text-indigo-600 font-bold text-sm' : 'text-slate-500 font-semibold text-sm';
+            if (tab === 'feed' && supabaseClient) loadPosts();
+        }
+
+        // Load Dictionary Words
+        async function loadWords() {
+            const { data, error } = await supabaseClient.from('dictionary').select('*').order('id', { ascending: false });
+            if (error) {
+                document.getElementById('word-list').innerHTML = `<p class="text-red-500 text-sm text-center">Table error: ${error.message}</p>`;
+                return;
+            }
+            allWords = data || [];
+            renderWords(allWords);
+        }
+
+        function renderWords(words) {
+            const list = document.getElementById('word-list');
+            if (words.length === 0) {
+                list.innerHTML = `<p class="text-center text-sm text-slate-400 py-4">No words yet. Add the first one above!</p>`;
+                return;
+            }
+            list.innerHTML = words.map(w => `
+                <div class="bg-white p-3.5 rounded-xl shadow-sm border-l-4 border-indigo-500">
+                    <div class="font-bold text-base text-slate-900">${w.word || w.chakma_word || 'Word'}</div>
+                    <div class="text-sm text-slate-600">${w.meaning || w.english_meaning || ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function filterWords() {
+            const q = document.getElementById('search-input').value.toLowerCase();
+            const filtered = allWords.filter(w => JSON.stringify(w).toLowerCase().includes(q));
+            renderWords(filtered);
+        }
+
+        async function addWord() {
+            if (!supabaseClient) return alert('Please add your Supabase keys first!');
+            const word = document.getElementById('chakma-word').value.trim();
+            const meaning = document.getElementById('english-meaning').value.trim();
+            if (!word || !meaning) return alert('Please fill in both fields.');
+
+            const { error } = await supabaseClient.from('dictionary').insert([{ word, meaning }]);
+            if (error) return alert('Error: ' + error.message);
+
+            document.getElementById('chakma-word').value = '';
+            document.getElementById('english-meaning').value = '';
+            loadWords();
+        }
+
+        // Community Posts
+        async function loadPosts() {
+            const { data, error } = await supabaseClient.from('posts').select('*').order('id', { ascending: false });
+            if (error) {
+                document.getElementById('feed-list').innerHTML = `<p class="text-red-500 text-sm text-center">Table error: ${error.message}</p>`;
+                return;
+            }
+            const list = document.getElementById('feed-list');
+            list.innerHTML = (data || []).map(p => `
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <p class="text-sm text-slate-800">${p.content || p.text || ''}</p>
+                </div>
+            `).join('') || `<p class="text-center text-sm text-slate-400 py-4">No posts yet.</p>`;
+        }
+
+        async function addPost() {
+            if (!supabaseClient) return alert('Please add your Supabase keys first!');
+            const content = document.getElementById('post-content').value.trim();
+            if (!content) return;
+
+            const { error } = await supabaseClient.from('posts').insert([{ content }]);
+            if (error) return alert('Error: ' + error.message);
+
+            document.getElementById('post-content').value = '';
+            loadPosts();
+        }
+    </script>
 </body>
 </html>
